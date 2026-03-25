@@ -1,7 +1,7 @@
 out_dir = 'out-rocstories'
 eval_interval = 1000
-eval_iters = 25
-log_interval = 100
+eval_iters = 10 # 25
+log_interval = 250
 
 always_save_checkpoint = True
 
@@ -10,8 +10,8 @@ wandb_project = 'rocstories'
 wandb_run_name = 'baby-gpt-rocstories'
 
 dataset = 'rocstories'
-gradient_accumulation_steps = 1
-batch_size = 16
+gradient_accumulation_steps = 2 # 1 [default]
+batch_size = 32
 block_size = 384
 
 # baseline baby GPT
@@ -22,8 +22,8 @@ dropout = 0.1
 bias = False
 
 learning_rate = 3e-4
-max_iters = 8000 # 6000
-lr_decay_iters = 8000 # 6000
+max_iters = 10000 # 6000
+lr_decay_iters = 10000 # 6000
 min_lr = 3e-5
 warmup_iters = 500 # 200
 

@@ -16,7 +16,9 @@ start = "FILE:data/rocstories/eval_prompts.txt" # Prompt. Can also specify a fil
 batch_prompts = True # if True, read multiple prompts from the file (one per line)
 output_file = 'samples.jsonl' # file to save generated samples in JSONL format (set to None to disable)
 num_samples = 1 # number of samples to generate for each prompt
+
 max_new_tokens = 512 # number of tokens generated in each sample``
+
 seed = 1337
 device = 'cuda' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
@@ -53,6 +55,12 @@ if init_from == 'resume':
             'temperature': 0.8,
             'top_k': 200
         }
+
+        # sample_params = {
+        #     'temperature': 0.7,
+        #     'top_k': 50,
+        # }
+
 elif init_from.startswith('gpt2'):
     # init from a given GPT-2 model
     model = GPT.from_pretrained(init_from, dict(dropout=0.0))
