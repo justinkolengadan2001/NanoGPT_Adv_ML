@@ -10,15 +10,15 @@ wandb_project = 'rocstories'
 wandb_run_name = 'baby-gpt-rocstories'
 
 dataset = 'rocstories'
-gradient_accumulation_steps = 2 # 1 [default]
-batch_size = 16
-block_size = 320
+gradient_accumulation_steps = 4 # 1 [default]
+batch_size = 16 # 64 [default] -> 16 with grad acc steps 4
+block_size = 384
 
 # baseline baby GPT
 n_layer = 7 # 6
 n_head = 8 # 6
 n_embd = 384
-dropout = 0.1
+dropout = 0.2
 bias = False
 
 learning_rate = 3e-4
