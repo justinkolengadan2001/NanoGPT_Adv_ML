@@ -22,12 +22,22 @@ import math
 import pickle
 from contextlib import nullcontext
 
+import csv
+
 import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
+
+out_dir = 'out-rocstories'
+metrics_csv = os.path.join(out_dir, 'metrics.csv')
+
+if not os.path.exists(metrics_csv):
+    with open(metrics_csv, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['iter', 'train_loss', 'val_loss', 'lr'])
 
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
@@ -262,6 +272,15 @@ while True:
     # evaluate the loss on train/val sets and write checkpoints
     if iter_num % eval_interval == 0 and master_process:
         losses = estimate_loss()
+
+        train_loss = losses['train']
+        val_loss = losses['val']
+        current_lr = optimizer.param_groups[0]['lr']
+
+        with open(metrics_csv, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([iter_num, float(train_loss), float(val_loss), float(current_lr)])
+            
         print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
         if wandb_log:
             wandb.log({

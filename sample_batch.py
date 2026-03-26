@@ -11,10 +11,10 @@ from model import GPTConfig, GPT
 
 # -----------------------------------------------------------------------------
 init_from = 'gpt2' # either 'resume' (from an out_dir) or a gpt2 variant (e.g. 'gpt2-xl')
-out_dir = 'out' # ignored if init_from is not 'resume'
+out_dir = 'out-rocstories' # ignored if init_from is not 'resume'
 start = "FILE:data/rocstories/eval_prompts.txt" # Prompt. Can also specify a file, use as: "FILE:prompt.txt"
 batch_prompts = True # if True, read multiple prompts from the file (one per line)
-output_file = 'samples.jsonl' # file to save generated samples in JSONL format (set to None to disable)
+output_file = out_dir + '/samples.jsonl' # file to save generated samples in JSONL format (set to None to disable)
 num_samples = 1 # number of samples to generate for each prompt
 
 max_new_tokens = 512 # number of tokens generated in each sample``
@@ -53,12 +53,27 @@ if init_from == 'resume':
     else:
         sample_params = {
             'temperature': 0.8,
-            'top_k': 200
+            'top_k': 50 # 200
         }
 
         # sample_params = {
-        #     'temperature': 0.7,
+        #     'temperature': 0.8,
+        #     'top_k': 25,
+        # }
+
+        # sample_params = {
+        #     'temperature': 0.8,
+        #     'top_k': 100,
+        # }
+
+        # sample_params = {
+        #     'temperature': 1.2,
         #     'top_k': 50,
+        # }
+
+        # sample_params = {
+        #     'temperature': 0.4,
+        #     'top_k': 100,
         # }
 
 elif init_from.startswith('gpt2'):
