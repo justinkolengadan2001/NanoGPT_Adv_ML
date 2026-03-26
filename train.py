@@ -31,14 +31,6 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
-out_dir = 'out-rocstories'
-metrics_csv = os.path.join(out_dir, 'metrics.csv')
-
-if not os.path.exists(metrics_csv):
-    with open(metrics_csv, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['iter', 'train_loss', 'val_loss', 'lr'])
-
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -49,6 +41,11 @@ eval_iters = 200
 eval_only = False # if True, script exits right after the first eval
 always_save_checkpoint = True # if True, always save a checkpoint after each eval
 init_from = 'scratch' # 'scratch' or 'resume' or 'gpt2*'
+# early stopping / metrics logging
+early_stopping = False
+early_stopping_patience = 5
+early_stopping_min_delta = 0.01
+metrics_file = 'metrics.csv'
 # wandb logging
 wandb_log = False # disabled by default
 wandb_project = 'owt'
@@ -113,6 +110,11 @@ print(f"tokens per iteration will be: {tokens_per_iter:,}")
 
 if master_process:
     os.makedirs(out_dir, exist_ok=True)
+metrics_csv = os.path.join(out_dir, metrics_file)
+if master_process and not os.path.exists(metrics_csv):
+    with open(metrics_csv, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['iter', 'train_loss', 'val_loss', 'lr'])
 torch.manual_seed(1337 + seed_offset)
 torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
@@ -143,6 +145,8 @@ def get_batch(split):
 # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
 iter_num = 0
 best_val_loss = 1e9
+no_improve_count = 0
+best_iter = 0
 
 # attempt to derive vocab_size from the dataset
 meta_path = os.path.join(data_dir, 'meta.pkl')
@@ -187,7 +191,9 @@ elif init_from == 'resume':
             state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
     model.load_state_dict(state_dict)
     iter_num = checkpoint['iter_num']
-    best_val_loss = checkpoint['best_val_loss']
+    best_val_loss = checkpoint.get('best_val_loss', 1e9)
+    no_improve_count = checkpoint.get('no_improve_count', 0)
+    best_iter = checkpoint.get('best_iter', iter_num)
 elif init_from.startswith('gpt2'):
     print(f"Initializing from OpenAI GPT-2 weights: {init_from}")
     # initialize from OpenAI GPT-2 weights
@@ -262,6 +268,7 @@ t0 = time.time()
 local_iter_num = 0 # number of iterations in the lifetime of this process
 raw_model = model.module if ddp else model # unwrap DDP container if needed
 running_mfu = -1.0
+should_stop = False
 while True:
 
     # determine and set the learning rate for this iteration
@@ -269,41 +276,70 @@ while True:
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-    # evaluate the loss on train/val sets and write checkpoints
-    if iter_num % eval_interval == 0 and master_process:
-        losses = estimate_loss()
+    # evaluate the loss on train/val sets, write metrics, and optionally early stop
+    if iter_num % eval_interval == 0:
+        improved = False
+        if master_process:
+            losses = estimate_loss()
 
-        train_loss = losses['train']
-        val_loss = losses['val']
-        current_lr = optimizer.param_groups[0]['lr']
+            train_loss = float(losses['train'])
+            val_loss = float(losses['val'])
+            current_lr = optimizer.param_groups[0]['lr']
 
-        with open(metrics_csv, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([iter_num, float(train_loss), float(val_loss), float(current_lr)])
-            
-        print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-        if wandb_log:
-            wandb.log({
-                "iter": iter_num,
-                "train/loss": losses['train'],
-                "val/loss": losses['val'],
-                "lr": lr,
-                "mfu": running_mfu*100, # convert to percentage
-            })
-        if losses['val'] < best_val_loss or always_save_checkpoint:
-            best_val_loss = losses['val']
-            if iter_num > 0:
+            with open(metrics_csv, 'a', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([iter_num, train_loss, val_loss, float(current_lr)])
+
+            print(f"step {iter_num}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
+            if wandb_log:
+                wandb.log({
+                    "iter": iter_num,
+                    "train/loss": train_loss,
+                    "val/loss": val_loss,
+                    "lr": lr,
+                    "mfu": running_mfu*100, # convert to percentage
+                })
+
+            improved = val_loss < (best_val_loss - early_stopping_min_delta)
+            if improved:
+                best_val_loss = val_loss
+                no_improve_count = 0
+                best_iter = iter_num
+                print(f"new best val loss: {best_val_loss:.4f} at iter {best_iter}")
+            else:
+                no_improve_count += 1
+                if early_stopping:
+                    print(f"no significant improvement for {no_improve_count}/{early_stopping_patience} evals")
+
+            if iter_num > 0 and (always_save_checkpoint or improved):
                 checkpoint = {
                     'model': raw_model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'model_args': model_args,
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
+                    'no_improve_count': no_improve_count,
+                    'best_iter': best_iter,
                     'config': config,
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                if improved:
+                    torch.save(checkpoint, os.path.join(out_dir, 'ckpt_best.pt'))
+
+            should_stop = early_stopping and (no_improve_count >= early_stopping_patience)
+            if should_stop:
+                print(f"early stopping triggered at iter {iter_num}")
+                print(f"best val loss: {best_val_loss:.4f} at iter {best_iter}")
+
+        if ddp:
+            stop_tensor = torch.tensor([1 if should_stop else 0], device=device)
+            torch.distributed.broadcast(stop_tensor, src=0)
+            should_stop = bool(stop_tensor.item())
+
     if iter_num == 0 and eval_only:
+        break
+    if should_stop:
         break
 
     # forward backward update, with optional gradient accumulation to simulate larger batch size
