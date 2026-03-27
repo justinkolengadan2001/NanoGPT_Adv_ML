@@ -1,0 +1,7 @@
+{
+  "temperature": 0.8,
+  "top_k": 50,
+  "stop_after_sentences": 4,
+  "stop_at_eot": true,
+  "min_new_tokens": 20
+}

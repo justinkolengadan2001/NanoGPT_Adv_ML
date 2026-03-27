@@ -19,23 +19,6 @@ def normalize_story(example):
 
     raise KeyError(f"Could not find story text fields in example keys: {list(example.keys())}")
 
-# def encode_split(stories):
-#     # Join stories with blank lines, as instructed
-#     # text = "\n\n".join(stories)
-#     # ids = enc.encode_ordinary(text)
-#     # return np.array(ids, dtype=np.uint16)
-
-#     eot = enc.eot_token  # end-of-text token
-#     ids = []
-
-#     for story in stories:
-#         story = story.strip()
-#         story_ids = enc.encode_ordinary(story)
-#         ids.extend(story_ids)
-#         ids.append(eot)  
-
-#     return np.array(ids, dtype=np.uint16)
-
 def encode_split(stories):
     eot = enc.eot_token
     ids = []

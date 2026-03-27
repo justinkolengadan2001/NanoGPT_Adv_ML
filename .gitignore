@@ -18,7 +18,6 @@ __pycache__/
 .ipynb_checkpoints/
 .env
 
-out*/
 *.pt
 *.bin
 *.pkl

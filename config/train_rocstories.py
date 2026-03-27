@@ -5,16 +5,11 @@ log_interval = 250
 
 always_save_checkpoint = True
 
-# wandb_log = False
-# wandb_project = 'rocstories'
-# wandb_run_name = 'baby-gpt-rocstories'
-
 dataset = 'rocstories'
 gradient_accumulation_steps = 1 
 batch_size = 16 
 block_size = 384 
 
-# baseline baby GPT
 n_layer = 6  
 n_head = 6
 n_embd = 384  

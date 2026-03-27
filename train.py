@@ -46,10 +46,7 @@ early_stopping = False
 early_stopping_patience = 5
 early_stopping_min_delta = 0.01
 metrics_file = 'metrics.csv'
-# wandb logging
-# wandb_log = False # disabled by default
-# wandb_project = 'owt'
-# wandb_run_name = 'gpt2' # 'run' + str(time.time())
+
 # data
 dataset = 'openwebtext'
 gradient_accumulation_steps = 1
@@ -257,11 +254,6 @@ def get_lr(it):
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
     return min_lr + coeff * (learning_rate - min_lr)
 
-# logging
-# if wandb_log and master_process:
-#     import wandb
-#     wandb.init(project=wandb_project, name=wandb_run_name, config=config)
-
 # training loop
 X, Y = get_batch('train') # fetch the very first batch
 t0 = time.time()
@@ -291,14 +283,6 @@ while True:
                 writer.writerow([iter_num, train_loss, val_loss, float(current_lr)])
 
             print(f"step {iter_num}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
-            # if wandb_log:
-            #     wandb.log({
-            #         "iter": iter_num,
-            #         "train/loss": train_loss,
-            #         "val/loss": val_loss,
-            #         "lr": lr,
-            #         "mfu": running_mfu*100, # convert to percentage
-            #     })
 
             improved = val_loss < (best_val_loss - early_stopping_min_delta)
             if improved:
