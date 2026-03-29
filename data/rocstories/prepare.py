@@ -27,7 +27,7 @@ def encode_split(stories):
         story = story.strip()
         story_ids = enc.encode_ordinary(story)
         ids.extend(story_ids)
-        ids.extend(enc.encode_ordinary("\n\n"))  # optional separator
+        ids.extend(enc.encode_ordinary("\n\n"))
         ids.append(eot)
 
     return np.array(ids, dtype=np.uint16)
@@ -55,6 +55,7 @@ def main():
     train_ids.tofile(os.path.join(DATA_DIR, "train.bin"))
     val_ids.tofile(os.path.join(DATA_DIR, "val.bin"))
 
+    # Without meta also the pipeline will work, but let's save vocab size for good measure
     meta = {
         "vocab_size": enc.n_vocab
     }
