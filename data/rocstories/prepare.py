@@ -187,20 +187,50 @@ def format_story(sentences, genre=None, use_story_tag=True):
     parts.extend(sentences)
     return " ".join(parts).strip()
 
+# def encode_split(stories, genres=None, verbose=True):
+#     eot = enc.eot_token
+#     ids = []
+#     kept = 0
+#     skipped = 0
 
-def encode_split(
-    stories,
-    genres=None,
-    strict_five=True,
-    use_story_tag=True,
-    convert_exclamation_to_period=True,
-    verbose=True,
-):
+#     for story in stories:
+#         story = story.strip()
+#         if not story:
+#             skipped += 1
+#             continue
+
+#         sentences = preprocess_story_to_five_sentences(story, strict_five=True, convert_exclamation_to_period=True,)
+
+#         if sentences is None or len(sentences) != 5:
+#             skipped += 1
+#             continue
+
+#         # Plain format: sentence1 sentence2 sentence3 sentence4 sentence5 <|endoftext|>
+#         text = " ".join(sentences).strip()
+
+#         story_ids = enc.encode_ordinary(text)
+#         ids.extend(story_ids)
+#         ids.append(eot)
+
+#         kept += 1
+
+#     if verbose:
+#         print(f"Kept stories   : {kept}")
+#         print(f"Skipped stories: {skipped}")
+
+#     return np.array(ids, dtype=np.uint16)
+
+def encode_split(stories, genres=None, verbose=True):
     eot = enc.eot_token
     ids = []
-
     kept = 0
     skipped = 0
+
+    # deterministic 60 / 20 / 20 split by story index
+    # pattern of 5:
+    # 0,1,2 -> plain story        (60%)
+    # 3     -> <|story|> story    (20%)
+    # 4     -> prompt/continuation (20%)
 
     for i, story in enumerate(stories):
         story = story.strip()
@@ -210,26 +240,27 @@ def encode_split(
 
         sentences = preprocess_story_to_five_sentences(
             story,
-            strict_five=strict_five,
-            convert_exclamation_to_period=convert_exclamation_to_period,
+            strict_five=True,
+            convert_exclamation_to_period=True,
         )
 
-        if sentences is None:
+        if sentences is None or len(sentences) != 5:
             skipped += 1
             continue
 
-        genre = None
-        if genres is not None:
-            if i < len(genres):
-                genre = genres[i] if genres[i].strip() else "Neutral"
-            else:
-                genre = "Neutral"
+        plain_text = " ".join(sentences).strip()
+        tagged_text = f"<|story|> {plain_text}".strip()
+        prompt = sentences[0]
+        continuation = " ".join(sentences[1:])
+        prompt_cont_text = f"<|story|> Prompt: {prompt} Continuation: {continuation}".strip()
 
-        text = format_story(
-            sentences,
-            genre=genre,
-            use_story_tag=use_story_tag,
-        )
+        mod = i % 5
+        if mod in [0, 1, 2]:
+            text = plain_text                 # 60%
+        elif mod == 3:
+            text = tagged_text               # 20%
+        else:
+            text = prompt_cont_text          # 20%
 
         story_ids = enc.encode_ordinary(text)
         ids.extend(story_ids)
@@ -243,6 +274,56 @@ def encode_split(
 
     return np.array(ids, dtype=np.uint16)
 
+# Alternate version that includes all 3 formats for each story, which is more data but less variety
+# def encode_split(stories, genres=None, verbose=True):
+#     eot = enc.eot_token
+#     ids = []
+#     kept = 0
+#     skipped = 0
+
+#     for story in stories:
+#         story = story.strip()
+#         if not story:
+#             skipped += 1
+#             continue
+
+#         sentences = preprocess_story_to_five_sentences(
+#             story,
+#             strict_five=True,
+#             convert_exclamation_to_period=True,
+#         )
+
+#         if sentences is None or len(sentences) != 5:
+#             skipped += 1
+#             continue
+
+#         plain_text = " ".join(sentences).strip()
+#         tagged_text = f"<|story|> {plain_text}".strip()
+
+#         prompt = sentences[0]
+#         continuation = " ".join(sentences[1:]).strip()
+#         prompt_cont_text = f"<|story|> Prompt: {prompt} Continuation: {continuation}".strip()
+
+#         all_versions = [
+#             plain_text,
+#             plain_text,
+#             tagged_text,
+#             prompt_cont_text,
+#         ]
+
+#         for text in all_versions:
+#             story_ids = enc.encode_ordinary(text)
+#             ids.extend(story_ids)
+#             ids.append(eot)
+
+#         kept += 1
+
+#     if verbose:
+#         print(f"Kept original stories   : {kept}")
+#         print(f"Skipped original stories: {skipped}")
+#         print(f"Total sequences written : {kept * 3}")
+
+#     return np.array(ids, dtype=np.uint16)
 
 # -------------------------------------------------
 # Main
@@ -251,49 +332,15 @@ def encode_split(
 def main():
     ds = load_dataset("mintujupally/ROCStories")
 
-    print(ds)
-
     train_split = ds["train"]
     test_split = ds["test"]
 
     train_stories = [normalize_story(ex) for ex in train_split]
     test_stories = [normalize_story(ex) for ex in test_split]
 
-    # Optional genre files
-    train_genre_path = os.path.join(DATA_DIR, "genre_train.txt")
-    test_genre_path = os.path.join(DATA_DIR, "genre_val.txt")
-
-    train_genres = load_genres(train_genre_path)
-    test_genres = load_genres(test_genre_path)
-
-    if train_genres is not None:
-        print(f"Loaded train genres: {len(train_genres):,}")
-    else:
-        print("No genre_train.txt found. Proceeding without genre tags.")
-
-    if test_genres is not None:
-        print(f"Loaded val genres  : {len(test_genres):,}")
-    else:
-        print("No genre_val.txt found. Proceeding without genre tags.")
-
     # assignment/train.py expects train.bin and val.bin
-    train_ids = encode_split(
-        train_stories,
-        genres=train_genres,
-        strict_five=True,
-        use_story_tag=True,
-        convert_exclamation_to_period=True,
-        verbose=True,
-    )
-
-    val_ids = encode_split(
-        test_stories,
-        genres=test_genres,
-        strict_five=True,
-        use_story_tag=True,
-        convert_exclamation_to_period=True,
-        verbose=True,
-    )
+    train_ids = encode_split(train_stories, genres=None, verbose=True)
+    val_ids = encode_split(test_stories, genres=None, verbose=True)
 
     print(f"train stories raw : {len(train_stories):,}")
     print(f"val stories raw   : {len(test_stories):,}")
@@ -303,14 +350,7 @@ def main():
     train_ids.tofile(os.path.join(DATA_DIR, "train.bin"))
     val_ids.tofile(os.path.join(DATA_DIR, "val.bin"))
 
-    # meta = {
-    #     "vocab_size": enc.n_vocab
-    # }
-    # with open(os.path.join(DATA_DIR, "meta.pkl"), "wb") as f:
-    #     pickle.dump(meta, f)
-
     print("Saved train.bin, val.bin")
-
 
 if __name__ == "__main__":
     main()
