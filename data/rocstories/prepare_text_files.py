@@ -179,7 +179,7 @@ def encode_split(stories, verbose=True):
 # -------------------------------------------------
 
 def main():
-    train_path = os.path.join(DATA_DIR, "augmented_train.txt")
+    train_path = os.path.join(DATA_DIR, "final_train.txt")
     val_path = os.path.join(DATA_DIR, "test.txt")
 
     train_stories = load_stories_from_txt(train_path)
