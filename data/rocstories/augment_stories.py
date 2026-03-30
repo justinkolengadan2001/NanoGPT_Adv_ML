@@ -11,13 +11,13 @@ OUTPUT_FILE = "augmented_train.txt"
 FAILED_FILE = "failed_augments.txt"
 PROGRESS_FILE = "augment_progress.txt"
 
-OLLAMA_MODEL = "llama3.2:3b"      # change to llama3.1:8b if wanted
+OLLAMA_MODEL = "llama3.2:3b"      # change to llama3.1:8b or llama3.2:3b if wanted
 TIMEOUT_SECONDS = 60
 MAX_RETRIES = 3
 
 # Chunking
-START_INDEX = 0
-END_INDEX = 250   # set None for all remaining stories
+START_INDEX = 7500 # 7500
+END_INDEX = 32500 # 32500   # set None for all remaining stories
 
 # Resume
 RESUME = True

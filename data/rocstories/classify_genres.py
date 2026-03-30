@@ -11,7 +11,7 @@ OUTPUT_FILE = "genre_train.txt"
 FAILED_FILE = "genre_failed.txt"
 PROGRESS_FILE = "genre_progress.txt"
 
-OLLAMA_MODEL = "llama3.1:8b"      # change to llama3.1:8b if wanted
+OLLAMA_MODEL = "llama3.2:3b"      # change to llama3.1:8b or llama3.2:3b if wanted
 TIMEOUT_SECONDS = 60
 MAX_RETRIES = 3
 

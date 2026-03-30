@@ -6,16 +6,16 @@ log_interval = 250
 always_save_checkpoint = True
 
 dataset = 'rocstories'
-gradient_accumulation_steps = 3  
+gradient_accumulation_steps = 2  
 batch_size = 16 
-block_size = 624
+block_size = 512
 
 n_layer = 7  
-n_head = 12 
+n_head = 8 
 n_embd = 384  
-dropout = 0.25
+dropout = 0.125
 bias = False
-learning_rate = 2.75e-4 
+learning_rate = 3.25e-4 
 
 early_stopping = False # True
 early_stopping_patience = 10
@@ -24,7 +24,7 @@ metrics_file = 'metrics.csv'
 
 max_iters = 20000 
 lr_decay_iters = 20000 
-min_lr = 2.75e-5 
+min_lr = 3.25e-5 
 warmup_iters = 1500
 
 weight_decay = 1e-1
