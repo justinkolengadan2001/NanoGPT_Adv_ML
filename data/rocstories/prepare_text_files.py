@@ -37,7 +37,6 @@ def normalize_unicode_punctuation(text):
         text = text.replace(src, tgt)
     return text
 
-
 def remove_weird_symbols(text):
     return re.sub(r"[^A-Za-z0-9\s\.,!?;:'\"()\-\n]", " ", text)
 
